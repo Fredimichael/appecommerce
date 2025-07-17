@@ -1,15 +1,13 @@
-import type { Metadata } from 'next';
-
 import Prose from 'components/prose';
-import { getPage } from 'lib/shopify';
+import { getPage } from 'lib/nest-api'; // Asegúrate que la ruta es correcta
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-export async function generateMetadata(props: {
-  params: Promise<{ page: string }>;
-}): Promise<Metadata> {
-  const params = await props.params;
+export async function generateMetadata({ params }: { params: { page: string } }): Promise<Metadata> {
   const page = await getPage(params.page);
 
+  // ¡AQUÍ ESTÁ LA CLAVE!
+  // Si la página no existe, detenemos la ejecución.
   if (!page) return notFound();
 
   return {
@@ -23,16 +21,17 @@ export async function generateMetadata(props: {
   };
 }
 
-export default async function Page(props: { params: Promise<{ page: string }> }) {
-  const params = await props.params;
+export default async function Page({ params }: { params: { page: string } }) {
   const page = await getPage(params.page);
 
+  // ¡Y AQUÍ TAMBIÉN!
+  // Comprobamos de nuevo por seguridad.
   if (!page) return notFound();
 
   return (
     <>
       <h1 className="mb-8 text-5xl font-bold">{page.title}</h1>
-      <Prose className="mb-8" html={page.body} />
+      <Prose className="mb-8" html={page.body as string} />
       <p className="text-sm italic">
         {`This document was last updated on ${new Intl.DateTimeFormat(undefined, {
           year: 'numeric',

@@ -8,99 +8,100 @@ import {
   removeFromCart,
   updateCart
 } from 'lib/nest-api';
+import { Cart } from 'lib/types/index';
 import { revalidateTag } from 'next/cache';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 
-export async function addItem(
-  prevState: any,
-  selectedVariantId: string | undefined
-) {
+/**
+ * Obtiene el carrito de las cookies o crea uno nuevo si no existe.
+ */
+async function getOrSetCart(): Promise<Cart> {
+  // Corregido: 'await' para resolver la promesa de cookies()
+  let cartId = (await cookies()).get('cartId')?.value;
+  let cart;
+
+  if (cartId) {
+    cart = await getCart(cartId);
+  }
+
+  // Si no hay ID de carrito o el carrito no se encontró en el backend, creamos uno nuevo
+  if (!cartId || !cart) {
+    cart = await createCart();
+    // Corregido: 'await' para resolver la promesa de cookies()
+    if (cart?.id) {
+        (await cookies()).set('cartId', cart.id);
+    }
+  }
+  
+  // Si después de todo, el carrito no existe, lanzamos un error.
+  if (!cart) {
+      throw new Error("Failed to create or retrieve cart.");
+  }
+  
+  return cart;
+}
+
+export async function addItem(prevState: any, selectedVariantId: string | undefined) {
   if (!selectedVariantId) {
-    return 'Error adding item to cart';
+    return 'Error: Se requiere el ID de la variante del producto.';
+  }
+  
+  const cart = await getOrSetCart();
+
+  // Corregido: Nos aseguramos de que cart.id exista antes de usarlo.
+  if (!cart.id) {
+    return "Error: No se pudo obtener o crear el ID del carrito."
   }
 
   try {
-    await addToCart([{ merchandiseId: selectedVariantId, quantity: 1 }]);
+    await addToCart(cart.id, [{ merchandiseId: selectedVariantId, quantity: 1 }]);
     revalidateTag(TAGS.cart);
   } catch (e) {
-    return 'Error adding item to cart';
+    return 'Error al añadir el producto al carrito';
   }
 }
 
-export async function removeItem(prevState: any, merchandiseId: string) {
+export async function removeItem(prevState: any, lineId: string) {
+  const cart = await getOrSetCart();
+  
+  // Corregido: Nos aseguramos de que cart.id exista.
+  if (!cart.id) return "Error: Carrito no encontrado.";
+
   try {
-    const cart = await getCart();
-
-    if (!cart) {
-      return 'Error fetching cart';
-    }
-
-    const lineItem = cart.lines.find(
-      (line) => line.merchandise.id === merchandiseId
-    );
-
-    if (lineItem && lineItem.id) {
-      await removeFromCart([lineItem.id]);
-      revalidateTag(TAGS.cart);
-    } else {
-      return 'Item not found in cart';
-    }
+    await removeFromCart(cart.id, [lineId]);
+    revalidateTag(TAGS.cart);
   } catch (e) {
-    return 'Error removing item from cart';
+    return 'Error al eliminar el producto del carrito';
   }
 }
 
 export async function updateItemQuantity(
   prevState: any,
   payload: {
-    merchandiseId: string;
+    lineId: string;
+    variantId: string;
     quantity: number;
   }
 ) {
-  const { merchandiseId, quantity } = payload;
+  const { lineId, quantity, variantId } = payload;
+  const cart = await getOrSetCart();
+  
+  // Corregido: Nos aseguramos de que cart.id exista.
+  if (!cart.id) return "Error: Carrito no encontrado.";
 
   try {
-    const cart = await getCart();
-
-    if (!cart) {
-      return 'Error fetching cart';
-    }
-
-    const lineItem = cart.lines.find(
-      (line) => line.merchandise.id === merchandiseId
-    );
-
-    if (lineItem && lineItem.id) {
-      if (quantity === 0) {
-        await removeFromCart([lineItem.id]);
-      } else {
-        await updateCart([
-          {
-            id: lineItem.id,
-            merchandiseId,
-            quantity
-          }
-        ]);
-      }
-    } else if (quantity > 0) {
-      // If the item doesn't exist in the cart and quantity > 0, add it
-      await addToCart([{ merchandiseId, quantity }]);
-    }
-
-    revalidateTag(TAGS.cart);
+      await updateCart(cart.id, [{id: lineId, merchandiseId: variantId, quantity}]);
+      revalidateTag(TAGS.cart);
   } catch (e) {
-    console.error(e);
-    return 'Error updating item quantity';
+    return 'Error al actualizar la cantidad del producto';
   }
 }
 
 export async function redirectToCheckout() {
-  let cart = await getCart();
-  redirect(cart!.checkoutUrl);
+    const cart = await getOrSetCart();
+    console.log("Procediendo al checkout con el carrito:", cart.id);
 }
 
 export async function createCartAndSetCookie() {
-  let cart = await createCart();
-  (await cookies()).set('cartId', cart.id!);
+  await getOrSetCart();
 }

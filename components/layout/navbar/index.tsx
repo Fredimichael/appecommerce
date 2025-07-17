@@ -1,7 +1,7 @@
 import CartModal from 'components/cart/modal';
 import LogoSquare from 'components/logo-square';
 import { getMenu } from 'lib/nest-api';
-import { Menu } from 'lib/shopify/types';
+import { Menu } from 'lib/types/index';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import MobileMenu from './mobile-menu';

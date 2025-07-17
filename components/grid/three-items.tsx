@@ -1,6 +1,6 @@
 import { GridTileImage } from 'components/grid/tile';
 import { getCollectionProducts } from 'lib/nest-api';
-import type { Product } from 'lib/shopify/types';
+import type { Product } from 'lib/types/index';
 import Link from 'next/link';
 
 function ThreeItemGridItem({
